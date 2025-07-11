@@ -30,11 +30,6 @@ This project implements a diffusion model for generating and processing images, 
    cd <repository-folder>
    ```
 
-2. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
 ## Usage
 
 ### Dataset Preparation

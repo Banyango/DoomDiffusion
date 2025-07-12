@@ -7,6 +7,9 @@ data/
 wheels/
 *.egg-info
 .idea
+checkpoints/
+samples/
+wads/
 
 # Virtual environments
 .venv

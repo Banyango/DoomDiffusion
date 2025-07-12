@@ -34,7 +34,7 @@ This project implements a diffusion model for generating and processing images, 
 
 ### Dataset Preparation
 
-Place your `.png` images in a folder (e.g., `data/doom_images`). The `DoomImages` class will automatically load and preprocess them.
+Place your `.png` images in a folder (e.g., `data/`). The `DoomImages` class will automatically load and preprocess them.
 
 ### Training the Model
 

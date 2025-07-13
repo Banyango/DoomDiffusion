@@ -5,19 +5,6 @@ from torch.utils.data import Dataset
 from PIL import Image
 import os
 
-class RandomGaussianBlur:
-    """Apply Gaussian Blur with random sigma."""
-    def __init__(self, p=0.5, radius_min=0.1, radius_max=2.0):
-        self.p = p
-        self.radius_min = radius_min
-        self.radius_max = radius_max
-
-    def __call__(self, img):
-        if random.random() < self.p:
-            sigma = random.uniform(self.radius_min, self.radius_max)
-            return F.gaussian_blur(img, kernel_size=5, sigma=sigma)
-        return img
-
 class DoomImages(Dataset):
     def __init__(self, folder: str, image_size: int = 64, transform=None):
         self.folder = folder

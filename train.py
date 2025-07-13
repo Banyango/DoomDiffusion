@@ -1,22 +1,24 @@
 import math
 import os
-from collections import deque
 
 import torch
 import matplotlib.pyplot as plt
+import torchvision
 from torch import nn
 from torch.utils.data import DataLoader
 from torchvision.transforms import transforms
 from tqdm import tqdm
 
-from image_dataset import DoomImages, RandomGaussianBlur
+from image_dataset import DoomImages
 from model import SimpleUNet
 
-BATCH_SIZE = 16
-IMAGE_SIZE = 32
+# Configuration
+RELOAD_MODEL_FROM_CHECKPOINT = True
+PATIENCE = 20
+BATCH_SIZE = 128
+IMAGE_SIZE = 64
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
 
 class EarlyStopper:
     def __init__(self, patience=5):
@@ -55,8 +57,8 @@ def cosine_beta_schedule(timesteps, s=0.008):
     betas = betas.clamp(max=0.999)
     return betas
 
-def main():
-    model = SimpleUNet(base_channels=32).to(device)
+def main(reload=False, final_output_path="final/result.pth"):
+    model = SimpleUNet(base_channels=64).to(device)
 
     print(f"using device: {device}")
 
@@ -65,20 +67,9 @@ def main():
 
     print("Loading Doom images dataset...")
     train_transform = transforms.Compose([
-        transforms.RandomResizedCrop(size=IMAGE_SIZE, scale=(0.8, 1.0), ratio=(0.9, 1.1)),
+        transforms.RandomResizedCrop(size=IMAGE_SIZE, scale=(0.8, 1.0), ratio=(0.9, 1.1), interpolation=torchvision.transforms.InterpolationMode.NEAREST),
         transforms.RandomHorizontalFlip(p=0.5),
-        transforms.ColorJitter(
-            brightness=0.3, contrast=0.3, saturation=0.3, hue=0.1
-        ),
-        transforms.RandomRotation(degrees=15),
-        RandomGaussianBlur(p=0.3),  # added
         transforms.ToTensor(),
-        transforms.RandomErasing(  # added
-            p=0.25,
-            scale=(0.02, 0.2),
-            ratio=(0.3, 3.3),
-            value='random'
-        ),
         transforms.Normalize([0.5] * 3, [0.5] * 3)
     ])
     dataset = DoomImages(folder="data/", image_size=IMAGE_SIZE, transform=train_transform)
@@ -86,7 +77,7 @@ def main():
 
     print(f"Dataset size: {len(dataset)}")
 
-    early_stopper = EarlyStopper(patience=50)
+    early_stopper = EarlyStopper(patience=PATIENCE)
     training_losses = []
 
     save_dir = "checkpoints"
@@ -113,8 +104,19 @@ def main():
 
     epochs_total = 1000
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs_total)
-    for epoch in range(epochs_total):
+
+    start_epoch = 0
+    if reload:
+        checkpoint = torch.load('checkpoints/best.pth')
+
+        model.load_state_dict(checkpoint['model_state_dict'])
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        scheduler.load_state_dict(checkpoint['scheduler_state_dict'])  # if applicable
+        start_epoch = checkpoint['epoch'] + 1  # resume from next epoch
+
+    for epoch in range(start_epoch, epochs_total):
         running_loss = 0.0
+        scheduler.step()
         pbar = tqdm(dataloader, desc=f"Epoch {epoch + 1}/{epochs_total}", unit="batch")
 
         for clean_images in pbar:
@@ -132,7 +134,6 @@ def main():
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            scheduler.step()
 
             running_loss = running_loss + (loss.item() * batch_size)
             pbar.set_postfix({"batch_loss": loss.item()})
@@ -141,16 +142,29 @@ def main():
         training_losses.append(epoch_loss)
         print(f"Epoch {epoch + 1}/{epochs_total}, Loss: {epoch_loss:.4f}")
 
-        # if epoch_loss <= early_stopper.best_loss:
-        #     torch.save(model.state_dict(), os.path.join(save_dir, "best.pth"))
-        #     print(f"✅ Best model saved at epoch {epoch + 1}")
+        if epoch_loss <= early_stopper.best_loss:
+            torch.save({
+                'epoch': epoch,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'scheduler_state_dict': scheduler.state_dict(),  # if using a scheduler
+                'loss': epoch_loss,
+            }, os.path.join(save_dir, "best.pth"))
+            print(f"✅ Best model saved at epoch {epoch + 1}")
 
-        # # Check early stopping
-        # if early_stopper.step(epoch_loss):
-        #     print(f"⏹️ Early stopping triggered at epoch {epoch + 1}")
-        #     break
+        # Check early stopping
+        if early_stopper.step(epoch_loss):
+            print(f"⏹️ Early stopping triggered at epoch {epoch + 1}")
+            break
 
-    torch.save(model.state_dict(), "checkpoint.pth")
+        # plot intermediate samples
+        plt.plot(training_losses)
+        plt.xlabel("Epoch")
+        plt.ylabel("Loss")
+        plt.title("Training Loss Curve")
+        plt.show()
+
+    torch.save(model.state_dict(), final_output_path)
 
     # Plot loss curve
     plt.plot(training_losses)
@@ -161,4 +175,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main(RELOAD_MODEL_FROM_CHECKPOINT, "final/result.pth")

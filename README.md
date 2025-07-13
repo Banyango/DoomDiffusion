@@ -17,7 +17,7 @@ This project implements a diffusion model for generating and processing images, 
 
 ## Requirements
 
-- Python 3.8+
+- Python 3.12+
 - PyTorch
 - NumPy
 - Pillow

@@ -4,6 +4,8 @@ __pycache__/
 build/
 dist/
 data/
+data_test/
+
 wheels/
 *.egg-info
 .idea

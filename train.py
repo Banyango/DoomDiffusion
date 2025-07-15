@@ -10,7 +10,7 @@ from torchvision.transforms import transforms
 from tqdm import tqdm
 
 from image_dataset import DoomImages
-from model import SimpleUNet
+from libs.models.simple_unet import SimpleUNet
 
 # Configuration
 RELOAD_MODEL_FROM_CHECKPOINT = True
@@ -20,18 +20,19 @@ IMAGE_SIZE = 64
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+
 class EarlyStopper:
     def __init__(self, patience=5):
         self.patience = patience
         self.counter = 0
-        self.best_loss = float('inf')
+        self.best_loss = float("inf")
 
     def step(self, val_loss):
         if val_loss < self.best_loss:
             self.best_loss = val_loss
             self.counter = 0
             return False
-        else :
+        else:
             self.counter += 1
             if self.counter >= self.patience:
                 return True
@@ -57,6 +58,7 @@ def cosine_beta_schedule(timesteps, s=0.008):
     betas = betas.clamp(max=0.999)
     return betas
 
+
 def main(reload=False, final_output_path="final/result.pth"):
     model = SimpleUNet(base_channels=64).to(device)
 
@@ -66,13 +68,22 @@ def main(reload=False, final_output_path="final/result.pth"):
     mse = nn.MSELoss()
 
     print("Loading Doom images dataset...")
-    train_transform = transforms.Compose([
-        transforms.RandomResizedCrop(size=IMAGE_SIZE, scale=(0.8, 1.0), ratio=(0.9, 1.1), interpolation=torchvision.transforms.InterpolationMode.NEAREST),
-        transforms.RandomHorizontalFlip(p=0.5),
-        transforms.ToTensor(),
-        transforms.Normalize([0.5] * 3, [0.5] * 3)
-    ])
-    dataset = DoomImages(folder="data/", image_size=IMAGE_SIZE, transform=train_transform)
+    train_transform = transforms.Compose(
+        [
+            transforms.RandomResizedCrop(
+                size=IMAGE_SIZE,
+                scale=(0.8, 1.0),
+                ratio=(0.9, 1.1),
+                interpolation=torchvision.transforms.InterpolationMode.NEAREST,
+            ),
+            transforms.RandomHorizontalFlip(p=0.5),
+            transforms.ToTensor(),
+            transforms.Normalize([0.5] * 3, [0.5] * 3),
+        ]
+    )
+    dataset = DoomImages(
+        folder="data/", image_size=IMAGE_SIZE, transform=train_transform
+    )
     dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=4)
 
     print(f"Dataset size: {len(dataset)}")
@@ -96,23 +107,26 @@ def main(reload=False, final_output_path="final/result.pth"):
         Forward diffusion (adding noise to the clean image at timestep t)
         """
         sqrt_alphas_cumprod = torch.sqrt(alphas_cumprod[t])[:, None, None, None]
-        sqrt_one_minus_alphas_cumprod = torch.sqrt(1 - alphas_cumprod[t])[:, None, None, None]
+        sqrt_one_minus_alphas_cumprod = torch.sqrt(1 - alphas_cumprod[t])[
+            :, None, None, None
+        ]
         return sqrt_alphas_cumprod * images + sqrt_one_minus_alphas_cumprod * noise
-
 
     # Training loop
 
     epochs_total = 1000
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs_total)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+        optimizer, T_max=epochs_total
+    )
 
     start_epoch = 0
     if reload:
-        checkpoint = torch.load('checkpoints/best.pth')
+        checkpoint = torch.load("checkpoints/best.pth")
 
-        model.load_state_dict(checkpoint['model_state_dict'])
-        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-        scheduler.load_state_dict(checkpoint['scheduler_state_dict'])  # if applicable
-        start_epoch = checkpoint['epoch'] + 1  # resume from next epoch
+        model.load_state_dict(checkpoint["model_state_dict"])
+        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        scheduler.load_state_dict(checkpoint["scheduler_state_dict"])  # if applicable
+        start_epoch = checkpoint["epoch"] + 1  # resume from next epoch
 
     for epoch in range(start_epoch, epochs_total):
         running_loss = 0.0
@@ -143,13 +157,16 @@ def main(reload=False, final_output_path="final/result.pth"):
         print(f"Epoch {epoch + 1}/{epochs_total}, Loss: {epoch_loss:.4f}")
 
         if epoch_loss <= early_stopper.best_loss:
-            torch.save({
-                'epoch': epoch,
-                'model_state_dict': model.state_dict(),
-                'optimizer_state_dict': optimizer.state_dict(),
-                'scheduler_state_dict': scheduler.state_dict(),  # if using a scheduler
-                'loss': epoch_loss,
-            }, os.path.join(save_dir, "best.pth"))
+            torch.save(
+                {
+                    "epoch": epoch,
+                    "model_state_dict": model.state_dict(),
+                    "optimizer_state_dict": optimizer.state_dict(),
+                    "scheduler_state_dict": scheduler.state_dict(),  # if using a scheduler
+                    "loss": epoch_loss,
+                },
+                os.path.join(save_dir, "best.pth"),
+            )
             print(f"✅ Best model saved at epoch {epoch + 1}")
 
         # Check early stopping

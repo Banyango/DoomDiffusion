@@ -4,7 +4,8 @@ import torchvision
 from tqdm import tqdm
 
 DEBUG = False
-LOAD_CHECKPOINT = False
+LOAD_CHECKPOINT = True
+
 
 def cosine_beta_schedule(timesteps, s=0.008):
     steps = timesteps + 1
@@ -16,7 +17,9 @@ def cosine_beta_schedule(timesteps, s=0.008):
 
 
 @torch.no_grad()
-def sample(model, img_size=64, channels=3, num_steps=1000, batch_size=16, save_dir="samples"):
+def sample(
+    model, img_size=64, channels=3, num_steps=1000, batch_size=16, save_dir="samples"
+):
     device = next(model.parameters()).device
     model.eval()
     os.makedirs(save_dir, exist_ok=True)
@@ -24,10 +27,12 @@ def sample(model, img_size=64, channels=3, num_steps=1000, batch_size=16, save_d
     betas = cosine_beta_schedule(num_steps).to(device)
     alphas = 1.0 - betas
     alphas_cumprod = torch.cumprod(alphas, dim=0)
-    alphas_cumprod_prev = torch.cat([torch.tensor([1.0], device=device), alphas_cumprod[:-1]])
+    alphas_cumprod_prev = torch.cat(
+        [torch.tensor([1.0], device=device), alphas_cumprod[:-1]]
+    )
     sqrt_recip_alphas = torch.sqrt(1.0 / alphas)
     sqrt_one_minus_alphas_cumprod = torch.sqrt(1 - alphas_cumprod)
-    posterior_variance = betas * (1. - alphas_cumprod_prev) / (1. - alphas_cumprod)
+    posterior_variance = betas * (1.0 - alphas_cumprod_prev) / (1.0 - alphas_cumprod)
     posterior_variance = posterior_variance.clamp(min=1e-20)
 
     x_t = torch.randn(batch_size, channels, img_size, img_size, device=device)
@@ -45,7 +50,9 @@ def sample(model, img_size=64, channels=3, num_steps=1000, batch_size=16, save_d
         eps = 1e-5  # prevent division by zero
         alpha_cumprod_t_safe = torch.clamp(alpha_cumprod_t, min=eps)
 
-        x_0_pred = (x_t - torch.sqrt(1 - alpha_cumprod_t) * predicted_noise) / torch.sqrt(alpha_cumprod_t_safe)
+        x_0_pred = (
+            x_t - torch.sqrt(1 - alpha_cumprod_t) * predicted_noise
+        ) / torch.sqrt(alpha_cumprod_t_safe)
         x_0_pred = x_0_pred.clamp(-1, 1)  # optional
 
         # posterior mean calculation
@@ -61,10 +68,14 @@ def sample(model, img_size=64, channels=3, num_steps=1000, batch_size=16, save_d
             x_t = mean
 
         if DEBUG:
-            debug_step_values(beta_t, coef1, coef2, mean, posterior_variance, t, x_0_pred, x_t)
+            debug_step_values(
+                beta_t, coef1, coef2, mean, posterior_variance, t, x_0_pred, x_t
+            )
 
         if t < 5 or t > num_steps - 5:
-            print(f"Step {t}: var={var.item() if t > 0 else 0}, mean norm={mean.norm().item()}")
+            print(
+                f"Step {t}: var={var.item() if t > 0 else 0}, mean norm={mean.norm().item()}"
+            )
 
         if (DEBUG and t % 100 == 0) or t == 0:
             img_grid = torchvision.utils.make_grid((x_t.clamp(-1, 1) + 1) / 2, nrow=4)
@@ -81,15 +92,18 @@ def debug_step_values(beta_t, coef1, coef2, mean, posterior_variance, t, x_0_pre
         print(f"  posterior_variance[t]: {posterior_variance[t].item():.6e}")
         print(f"  coef1: {coef1.item():.6f}, coef2: {coef2.item():.6f}")
         print(
-            f"  x_0_pred min/max/mean/std: {x_0_pred.min().item():.3f} / {x_0_pred.max().item():.3f} / {x_0_pred.mean().item():.3f} / {x_0_pred.std().item():.3f}")
+            f"  x_0_pred min/max/mean/std: {x_0_pred.min().item():.3f} / {x_0_pred.max().item():.3f} / {x_0_pred.mean().item():.3f} / {x_0_pred.std().item():.3f}"
+        )
         print(
-            f"  mean min/max/mean/std: {mean.min().item():.3f} / {mean.max().item():.3f} / {mean.mean().item():.3f} / {mean.std().item():.3f}")
+            f"  mean min/max/mean/std: {mean.min().item():.3f} / {mean.max().item():.3f} / {mean.mean().item():.3f} / {mean.std().item():.3f}"
+        )
         print(
-            f"  x_t min/max/mean/std: {x_t.min().item():.3f} / {x_t.max().item():.3f} / {x_t.mean().item():.3f} / {x_t.std().item():.3f}")
+            f"  x_t min/max/mean/std: {x_t.min().item():.3f} / {x_t.max().item():.3f} / {x_t.mean().item():.3f} / {x_t.std().item():.3f}"
+        )
 
 
 if __name__ == "__main__":
-    from model import SimpleUNet
+    from src.libs.models.simple_unet import SimpleUNet
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print("Using device:", device)
@@ -109,6 +123,6 @@ if __name__ == "__main__":
         checkpoint = torch.load("checkpoints/best.pth", map_location=device)
         model.load_state_dict(checkpoint["model_state_dict"])
     else:
-        model.load_state_dict(torch.load(".pth", map_location=device))
+        model.load_state_dict(torch.load("results/v1.pth", map_location=device))
 
     sample(model, img_size=64, batch_size=16, num_steps=1000, save_dir="samples")

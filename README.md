@@ -41,7 +41,7 @@ Place your `.png` images in a folder (e.g., `data/`). The `DoomImages` class wil
 1. Import the dataset and model:
    ```python
    from image_dataset import DoomImages
-   from model import SimpleUNet
+   from libs.models.simple_unet import SimpleUNet
    ```
 
 2. Initialize the dataset and model:

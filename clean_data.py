@@ -26,9 +26,9 @@ def move_files_to_data_dir():
     import os
     import shutil
 
-    source_dir = './data_test'
-    destination_dir = './data'
-    dead_letter_folder = './to_delete'
+    source_dir = "./data_test"
+    destination_dir = "./data"
+    dead_letter_folder = "./to_delete"
 
     if not os.path.exists(destination_dir):
         os.makedirs(destination_dir)
@@ -47,7 +47,8 @@ def move_files_to_data_dir():
             # Optionally, you can delete the file if it is mostly black
             shutil.move(source_file, dead_letter_folder)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     move_files_to_data_dir()
-    #print(is_mostly_black("./data_test/w96_2.png"))
-    #print(is_mostly_black("./data_test/3FO_BM02.png"))
+    # print(is_mostly_black("./data_test/w96_2.png"))
+    # print(is_mostly_black("./data_test/3FO_BM02.png"))
